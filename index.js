@@ -33,6 +33,10 @@ const start = () => {
 }
 
 const download = async (id) => {
+    let beatmap
+    let audioname
+    let audioBlob
+   
     log("Finding beatmap " + id + " in nerinyan.moe...")
 
     const data = await fetch(`${APIURL}/search?q=${id}&option=mapid&s=all&nsfw=1`, {
@@ -69,7 +73,7 @@ const download = async (id) => {
             audioname = osu.match(/(?<=AudioFilename: ).+(?=)/)?.[0]
             if (!audioname) return log("Error: Audio not found")
             for (const file of files) {
-                if (file.filename === audioname) {
+                if (file.filename == audioname) {
                     audioBlob = await file.getData(new zip.BlobWriter("audio/" + audioname.split(".").pop()))
                     break
                 }
