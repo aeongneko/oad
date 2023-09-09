@@ -46,7 +46,8 @@ const download = async (id) => {
         return r.json()
     })
 
-    const beatmapset = await data[0]
+    const beatmapset = await data?.[0]
+    if (!beatmapset) return log("Error: beatmap not found")
     for (const bm of beatmapset.beatmaps) {
         if (bm.id == id) {
             beatmap = bm
