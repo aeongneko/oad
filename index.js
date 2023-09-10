@@ -2,50 +2,58 @@ const urlParams = new URLSearchParams(window.location.search)
 const consoleArea = document.getElementById("consoleArea")
 const basePath = window.location.href.split("?")[0]
 
-const init = `- osu audio downloader
-    * usage: ${basePath}?id=<BEATMAP_ID>
-    * usage: ${basePath}?id=2407152
+const init = `- osu assets downloader
+    * usage: ${basePath}?id=<BEATMAP_ID>&server=<SERVERID>
+      - server id:
+        * 0 or not specified: nerinyan (nerinyan.moe)
+        * 1: mino (catboy.best)
+    * example: ${basePath}?id=2223750
 
-- this site uses nerinyan.moe for downloading beatmap
-  if you want to download bg, use https://api.nerinyan.moe/bg/<BEATMAPSET_ID>
+- skips storyboard assets for optimization
 `
-const APIURL = "https://api.nerinyan.moe"
+const API_URL = "https://api.nerinyan.moe"
+
+const MAPDL_URL = [
+    "https://proxy.nerinyan.moe/d/",
+    "https://catboy.best/d/"
+]
 
 const getquery = (query) => {
     if (!urlParams.has(query)) return null
     return urlParams.get(query)
 }
 
-const log = (content, scroll = true) => {
-    consoleArea.append(content + "\n")
-    if (scroll) consoleArea.scrollTo({
-        top: document.body.scrollHeight,
-        behavior: "smooth"
-    })
-}
+const scrollWindow = () => window.scrollTo({
+    top: document.body.scrollHeight,
+    behavior: "smooth"
+})
+
+const log = (content) => consoleArea.append(content + "\n")
 
 
 const start = () => {
     if (window.location.search == "") return log(init)
     const beatmapid = getquery("id")
+    const server = getquery("server")
     if (isNaN(beatmapid)) return log("Invalid beatmap id\n\n" + init)
-    return download(beatmapid)
+    if (isNaN(server)) return log("Invalid server id\n\n" + init)
+
+    return download(beatmapid, server)
 }
 
-const download = async (id) => {
+const download = async (id, server) => {
     let beatmap
-    let audioname
-    let audioBlob
-   
-    log("Finding beatmap " + id + " in nerinyan.moe...")
 
-    const data = await fetch(`${APIURL}/search?q=${id}&option=mapid&s=all&nsfw=1`).then(r => {
+    log(`Finding beatmap ${id}...`)
+
+    const data = await fetch(`${API_URL}/search?q=${id}&option=mapid&s=all&nsfw=1`).then(r => {
         if (!r.ok) return log("Error: " + r.status)
         return r.json()
     })
 
     const beatmapset = await data?.[0]
     if (!beatmapset) return log("Error: beatmap not found")
+
     for (const bm of beatmapset.beatmaps) {
         if (bm.id == id) {
             beatmap = bm
@@ -53,9 +61,11 @@ const download = async (id) => {
         }
     }
 
-    log("Beatmap found, downloading...")
+    log(`Beatmap found, downloading on mirror id: ${server ?? 0}...`)
 
-    const blob = await fetch(`https://proxy.nerinyan.moe/d/${beatmapset.id}`).then(r => {
+    const serverURL = MAPDL_URL[server] ?? MAPDL_URL[0]
+
+    const blob = await fetch(serverURL + beatmapset.id).then(r => {
         if (!r.ok) return log("Error: " + r.status)
         return r.blob()
     })
@@ -64,29 +74,26 @@ const download = async (id) => {
 
     const reader = new zip.ZipReader(new zip.BlobReader(blob))
     const files = await reader.getEntries()
-    for (const file of files) {
-        if (file.filename === beatmap.osu_file) {
-            const osu = await file.getData(new zip.TextWriter("utf-8"))
-            audioname = osu.match(/(?<=AudioFilename: ).+(?=)/)?.[0]
-            if (!audioname) return log("Error: Audio not found")
-            for (const file of files) {
-                if (file.filename == audioname) {
-                    audioBlob = await file.getData(new zip.BlobWriter("audio/" + audioname.split(".").pop()))
-                    break
-                }
-            }
-            break
-        }
+    for (let i = 0; i < files.length; i++) {
+        const filename = files[i].filename
+        if (filename.startsWith("sb/")) continue
+
+        // wait, this is so bad
+        const ext = filename.split(".").pop()
+        if (ext == "mp3" || ext == "ogg" || ext == "wav") mime = `audio/${ext}`
+        else if (ext == "jpg" || ext == "png") mime = `image/${ext}`
+        else mime = "text/plain"
+
+        const fileBlob = await files[i].getData(new zip.BlobWriter(mime))
+        const a = document.createElement("a")
+        a.href = URL.createObjectURL(fileBlob)
+        a.appendChild(document.createTextNode(filename))
+        document.body.appendChild(a)
+        document.body.appendChild(document.createElement("br"))
+        scrollWindow()
     }
     await reader.close()
-
-    log("Audio extracted! " + audioname)
-
-    const audioElement = document.createElement("audio")
-    audioElement.setAttribute("controls", "")
-    audioElement.setAttribute("autoplay", "true")
-    audioElement.setAttribute("src", URL.createObjectURL(audioBlob))
-    document.body.appendChild(audioElement)
+    log("Extracted, done!")
 }
 
 start()
