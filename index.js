@@ -39,9 +39,7 @@ const download = async (id) => {
    
     log("Finding beatmap " + id + " in nerinyan.moe...")
 
-    const data = await fetch(`${APIURL}/search?q=${id}&option=mapid&s=all&nsfw=1`, {
-        cache: "no-cache"
-    }).then(r => {
+    const data = await fetch(`${APIURL}/search?q=${id}&option=mapid&s=all&nsfw=1`).then(r => {
         if (!r.ok) return log("Error: " + r.status)
         return r.json()
     })
@@ -57,9 +55,7 @@ const download = async (id) => {
 
     log("Beatmap found, downloading...")
 
-    const blob = await fetch(`https://proxy.nerinyan.moe/d/${beatmapset.id}`, {
-        cache: "no-cache"
-    }).then(r => {
+    const blob = await fetch(`https://proxy.nerinyan.moe/d/${beatmapset.id}`).then(r => {
         if (!r.ok) return log("Error: " + r.status)
         return r.blob()
     })
